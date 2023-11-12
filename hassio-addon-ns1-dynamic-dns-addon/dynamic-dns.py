@@ -2,10 +2,17 @@
 
 from ns1 import NS1, Config
 import os
+import sys
 import requests
 import time
 import yaml
+import json
 
+def load_json_config(config_path):
+    """Load config from Home Assistant Add-On"""
+
+    current_config_file = os.path.join(config_path)
+    return json.load(open(current_config_file))
 
 def check_ip(record):
     """ Check whether current IP matches IP in DNS
@@ -36,20 +43,27 @@ def log_print(log_string):
 
 
 def main():
-    if os.path.isfile('/config.yml') is not True:
-        print('/config.yml does not exist or is not a file, exiting.')
+
+    # Load config from HA addon config
+    config = load_json_config('/data/options.json')
+
+    print('Config:')
+    print(config)
+
+    if not config['ns1']:
+        print('No configuration defined in the add-on, exiting.')
         exit(1)
 
-    config_file = yaml.load(open('/config.yml', 'r'))
+    config_file = config['ns1']
 
     for domain in config_file:
         nsone_config = Config()
-        nsone_config.createFromAPIKey(config_file[domain]['api-key'])
+        nsone_config.createFromAPIKey(domain['api-key'])
         nsone_config["transport"] = "requests"
         client = NS1(config=nsone_config)
-        zone = client.loadZone(domain)
+        zone = client.loadZone(domain['zone'])
 
-        for record in config_file[domain]['records-to-update']:
+        for record in domain['records-to-update']:
             record = zone.loadRecord(record, 'A')
             result = check_ip(record)
             if result['matches'] is False:
